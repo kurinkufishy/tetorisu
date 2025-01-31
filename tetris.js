@@ -7,9 +7,13 @@ const ROWS = 20;
 const COLUMNS = 10;
 const BLOCK_SIZE = 30;
 let score = 0;
+let dropCounter = 0;
 let dropInterval = 500;
+let lastTime = 0;
 let holdPiece = null;
 let canHold = true;
+let board = createMatrix(ROWS, COLUMNS);
+let piece = createPiece();
 
 canvas.width = COLUMNS * BLOCK_SIZE;
 canvas.height = ROWS * BLOCK_SIZE;
@@ -19,17 +23,22 @@ holdContext.scale(30, 30);
 const COLORS = [null, "cyan", "blue", "orange", "yellow", "green", "purple", "red"];
 const SHAPES = [
     [],
-    [[1, 1, 1, 1]], // I
-    [[1, 1, 1], [0, 0, 1]], // L
-    [[1, 1, 1], [1, 0, 0]], // J
-    [[1, 1], [1, 1]], // O
-    [[0, 1, 1], [1, 1, 0]], // S
-    [[0, 1, 0], [1, 1, 1]], // T
-    [[1, 1, 0], [0, 1, 1]]  // Z
+    [[1, 1, 1, 1]],
+    [[1, 1, 1], [0, 0, 1]],
+    [[1, 1, 1], [1, 0, 0]],
+    [[1, 1], [1, 1]],
+    [[0, 1, 1], [1, 1, 0]],
+    [[0, 1, 0], [1, 1, 1]],
+    [[1, 1, 0], [0, 1, 1]]
 ];
 
 function createMatrix(rows, columns) {
     return Array.from({ length: rows }, () => Array(columns).fill(0));
+}
+
+function createPiece() {
+    const type = Math.floor(Math.random() * (SHAPES.length - 1)) + 1;
+    return { type, shape: SHAPES[type], x: 3, y: 0 };
 }
 
 function collide(board, piece) {
@@ -43,9 +52,7 @@ function collide(board, piece) {
 function merge(board, piece) {
     piece.shape.forEach((row, y) => {
         row.forEach((value, x) => {
-            if (value) {
-                board[y + piece.y][x + piece.x] = piece.type;
-            }
+            if (value) board[y + piece.y][x + piece.x] = piece.type;
         });
     });
 }
@@ -54,9 +61,9 @@ function rotate(matrix) {
     return matrix[0].map((_, i) => matrix.map(row => row[i]).reverse());
 }
 
-function removeLines(board) {
+function removeLines() {
     let linesCleared = 0;
-    let newBoard = board.filter(row => {
+    board = board.filter(row => {
         if (row.every(cell => cell !== 0)) {
             linesCleared++;
             return false;
@@ -64,17 +71,15 @@ function removeLines(board) {
         return true;
     });
 
-    while (newBoard.length < ROWS) {
-        newBoard.unshift(Array(COLUMNS).fill(0));
+    while (board.length < ROWS) {
+        board.unshift(Array(COLUMNS).fill(0));
     }
 
     if (linesCleared > 0) {
         score += linesCleared * 100;
         document.getElementById("score").innerText = score;
-        updateSpeed();
+        dropInterval = Math.max(100, 500 - Math.floor(score / 500) * 50);
     }
-
-    return newBoard;
 }
 
 function drawMatrix(matrix, offset, ctx = context) {
@@ -102,8 +107,8 @@ function dropPiece() {
     if (collide(board, piece)) {
         piece.y--;
         merge(board, piece);
-        board = removeLines(board);
-        resetPiece();
+        removeLines();
+        piece = createPiece();
         canHold = true;
         if (collide(board, piece)) {
             board = createMatrix(ROWS, COLUMNS);
@@ -130,26 +135,13 @@ function rotatePiece() {
     }
 }
 
-function resetPiece() {
-    piece.type = Math.floor(Math.random() * (SHAPES.length - 1)) + 1;
-    piece.shape = SHAPES[piece.type];
-    piece.x = Math.floor(COLUMNS / 2) - Math.floor(piece.shape[0].length / 2);
-    piece.y = 0;
-}
-
-function updateSpeed() {
-    dropInterval = Math.max(100, 500 - Math.floor(score / 500) * 50);
-}
-
 function hold() {
     if (!canHold) return;
     if (holdPiece === null) {
         holdPiece = { type: piece.type, shape: piece.shape };
-        resetPiece();
+        piece = createPiece();
     } else {
         [holdPiece, piece] = [{ type: piece.type, shape: piece.shape }, holdPiece];
-        piece.x = Math.floor(COLUMNS / 2) - Math.floor(piece.shape[0].length / 2);
-        piece.y = 0;
     }
     canHold = false;
 }
@@ -161,7 +153,11 @@ function drawHold() {
     }
 }
 
+const keys = {};
 document.addEventListener("keydown", (event) => {
+    if (keys[event.key]) return;
+    keys[event.key] = true;
+
     if (event.key === "a") movePiece(-1);
     if (event.key === "d") movePiece(1);
     if (event.key === "s") dropPiece();
@@ -169,15 +165,22 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Shift") hold();
 });
 
-let board = createMatrix(ROWS, COLUMNS);
-let piece = { type: 0, shape: [], x: 0, y: 0 };
+document.addEventListener("keyup", (event) => {
+    keys[event.key] = false;
+});
 
-resetPiece();
+function update(time = 0) {
+    const deltaTime = time - lastTime;
+    lastTime = time;
+    dropCounter += deltaTime;
+    
+    if (dropCounter > dropInterval) {
+        dropPiece();
+        dropCounter = 0;
+    }
 
-function update() {
-    dropPiece();
     draw();
-    setTimeout(update, dropInterval);
+    requestAnimationFrame(update);
 }
 
 update();
