@@ -10,10 +10,18 @@
             display: block;
             margin: auto;
         }
+        .container {
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-    <canvas id="tetris" width="300" height="600"></canvas>
+    <div class="container">
+        <h1>スコア: <span id="score">0</span></h1>
+        <h2>ホールド:</h2>
+        <canvas id="hold" width="90" height="90"></canvas>
+        <canvas id="tetris" width="300" height="600"></canvas>
+    </div>
     <script src="tetris.js"></script>
 </body>
 </html>
